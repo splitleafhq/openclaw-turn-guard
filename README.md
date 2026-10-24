@@ -27,20 +27,20 @@ Docs relied on: tool registration and the matching `contracts.tools` entry, `doc
 
 > Budget spent: no more searches or fetches this task. Publish the brief from your notes and say what you didn't check.
 
-- A run is keyed by `runId`. A repeated `toolCallId` in one run counts once.
-- No `runId`: the count falls back to the session key. No `runId` and no session key: the call is not counted, because there is nothing to attribute it to and a shared bucket would let unrelated runs block each other. The handler fails open on any error, because a throw blocks the call.
-- Counters are dropped at `agent_end` and, lazily on each call, when idle over 6 hours. There are no timers.
-- `agent_end` ends an attempt, not a run, so a retried run restarts its count. See [docs/verification.md](docs/verification.md).
+- A run is keyed by `runId`, which stays the same across a run's attempts (compaction retries), so the count holds for the whole run. A repeated call, the same `toolCallId` with the same tool and arguments, counts once; a reused id with other arguments counts again.
+- No `runId`: the call is not counted, because a shared bucket would let unrelated runs block each other. The handler fails open on any error, because a throw blocks the call.
+- `agent_end` ends an attempt, not a run, so it does not reset the count. Counters are dropped lazily on each call when idle over 6 hours. There are no timers.
+- Agent ids match without regard to case.
 
 Docs relied on: `before_tool_call` fields and `block`/`blockReason`, `docs/plugins/hooks/tool-policy.md`; fail-closed on throw or timeout, `docs/plugins/hooks/reference.md`; `runId` on hooks and context, `docs/plugins/hooks/prompt-and-session.md`.
 
 ### 3. Turn log
 
-`agent_end` handler, registered only when the operator sets `plugins.entries.turn-guard.hooks.allowConversationAccess: true` (without the grant OpenClaw blocks the hook for a non-bundled plugin; `docs/plugins/hooks/reference.md`, conversation access). Without it the plugin warns once and skips this part and the `agent_end` budget reset.
+`agent_end` handler, registered only when the operator sets `plugins.entries.turn-guard.hooks.allowConversationAccess: true` (without the grant OpenClaw blocks the hook for a non-bundled plugin; `docs/plugins/hooks/reference.md`, conversation access). Without it the plugin warns once and skips this part. `agent_end` fires once per attempt, so a run retried after compaction is checked at each attempt, with every tool call of the run so far.
 
 A line is written for:
-- **unbacked-claim:** the last assistant message has a first-person past or perfect claim (`I sent`, `I've queued`, `we have posted`, with `dispatched` and `scheduled`), and the run has no successful call of a tool that can back that verb (`sent`: `message`, `sessions_send`, `conversations_send`, `publish_brief`; `scheduled`: `cron`; and so on, see `BACKING_TOOLS` in `src/audit.ts`). Tool calls come from `after_tool_call`.
-- **run-error:** the run ended unsuccessfully or with an error string.
+- **unbacked-claim:** the last assistant message claims a done action: first person (`I sent`, `I've gone ahead and queued`), passive without an agent (`has been sent`, `is queued`, not `was sent by …`) or a bare verb opening a sentence (`Queued.`, `Message sent.`), for sent, queued, dispatched, scheduled, posted, forwarded, delivered or submitted. It is logged when the run has no successful call of a tool that can back that verb (`sent`: `message`, `sessions_send`, `conversations_send`, `publish_brief`; `scheduled`: `automations`, the name hooks use for `cron`; and so on, see `BACKING_TOOLS` in `src/audit.ts`). Tool calls come from `after_tool_call`. A heuristic: its precision is unmeasured.
+- **run-error:** the attempt ended with an error string. An abort, yield or timeout ends with no error and is not logged.
 
 Each line holds the time, agent id, session key, run id, the matched phrase (at most 120 characters around it) or the error (at most 300), and the tool names with ok or error. No transcripts. The file is `logFile`, default `<state dir>/logs/turn-guard.jsonl`, with the state dir from `api.runtime.state.resolveStateDir` (`docs/plugins/sdk-runtime/state-and-system.md`), mode 0600.
 

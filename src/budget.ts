@@ -10,7 +10,7 @@ interface Entry {
 
 /**
  * Counts budgeted tool calls per run. Entries older than six hours are dropped on each call, so nothing needs a timer
- * and a run that never reaches `agent_end` can't grow the map.
+ * and the map can't grow without bound. There is no per-run end: `agent_end` fires per attempt.
  */
 export class Budget {
   private readonly runs = new Map<string, Entry>();
@@ -44,10 +44,6 @@ export class Budget {
       entry.seen.add(callId);
     }
     return undefined;
-  }
-
-  end(key: string): void {
-    this.runs.delete(key);
   }
 
   get size(): number {

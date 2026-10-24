@@ -2,15 +2,32 @@ import { appendFile, chmod, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { MAX_AGE_MS } from './budget.ts';
 
-const CLAIM = /\b(?:I|we)(?:['’]ve| have)?\s+(?:(?:just|already|now|successfully)\s+)?(sent|queued|dispatched|scheduled|posted)\b/i;
+const VERBS = 'sent|queued|dispatched|scheduled|posted|forwarded|delivered|submitted';
+const ADVERBS = '(?:(?:just|already|now|also|successfully|gone ahead and|went ahead and)\\s+)*';
+
+/**
+ * First person ("I've sent", "we went ahead and queued"), passive without an agent ("has been sent", "is queued", not
+ * "was sent by Regis") and a bare verb opening a sentence ("Queued.", "Message sent."). A heuristic for a log, so it
+ * leans toward matching.
+ */
+const CLAIMS = [
+  new RegExp(`\\b(?:I|we)(?:['’]ve| have)?\\s+${ADVERBS}(${VERBS})\\b`, 'i'),
+  new RegExp(`\\b(?:has|have|had) been\\s+${ADVERBS}(${VERBS})\\b(?!\\s+by\\b)`, 'i'),
+  new RegExp(`\\b(?:is|are|was|were)\\s+(?:now\\s+)?(${VERBS})\\b(?!\\s+by\\b)`, 'i'),
+  new RegExp(`(?:^|[.!?]\\s+|\\n\\s*)(?:(?:message|brief|it|request|task|job)\\s+)?(${VERBS})\\s*[.!]`, 'i'),
+];
 
 /** Tools whose successful call backs each claimed verb. A claim with none of these in the run is logged. */
 export const BACKING_TOOLS: Record<string, string[]> = {
   sent: ['message', 'sessions_send', 'conversations_send', 'publish_brief'],
+  forwarded: ['message', 'sessions_send', 'conversations_send'],
+  delivered: ['message', 'sessions_send', 'conversations_send', 'publish_brief'],
   posted: ['message', 'publish_brief'],
-  queued: ['sessions_send', 'sessions_spawn', 'cron', 'message'],
+  // Hooks report cron as `automations` (OpenClaw 2026.10.5 TOOL_NAME_ALIASES); `cron` is kept for older names.
+  queued: ['sessions_send', 'sessions_spawn', 'automations', 'cron', 'message'],
+  submitted: ['sessions_send', 'sessions_spawn', 'automations', 'cron', 'message'],
   dispatched: ['sessions_send', 'sessions_spawn', 'message'],
-  scheduled: ['cron'],
+  scheduled: ['automations', 'cron'],
 };
 
 export interface Claim {
@@ -18,14 +35,20 @@ export interface Claim {
   phrase: string;
 }
 
-/** A first-person past or perfect claim, with up to 120 characters of text around it. */
+/** The earliest claim in the text, with up to 120 characters of text around it. */
 export function findClaim(text: string): Claim | undefined {
-  const match = CLAIM.exec(text);
-  if (!match?.[1]) {
+  let first: RegExpExecArray | undefined;
+  for (const pattern of CLAIMS) {
+    const match = pattern.exec(text);
+    if (match?.[1] && (first === undefined || match.index < first.index)) {
+      first = match;
+    }
+  }
+  if (!first?.[1]) {
     return undefined;
   }
-  const start = Math.max(0, match.index - 50);
-  return { verb: match[1].toLowerCase(), phrase: text.slice(start, start + 120).replaceAll(/\s+/g, ' ').trim() };
+  const start = Math.max(0, first.index - 50);
+  return { verb: first[1].toLowerCase(), phrase: text.slice(start, start + 120).replaceAll(/\s+/g, ' ').trim() };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -89,13 +112,9 @@ export class ToolLog {
     this.runs.set(runId, run);
   }
 
-  take(runId: string | undefined): ToolRecord[] {
-    if (runId === undefined) {
-      return [];
-    }
-    const tools = this.runs.get(runId)?.tools ?? [];
-    this.runs.delete(runId);
-    return tools;
+  /** The run's calls so far. Kept after reading: a later attempt of the same run still sees them. */
+  list(runId: string | undefined): ToolRecord[] {
+    return runId === undefined ? [] : [...(this.runs.get(runId)?.tools ?? [])];
   }
 
   private evict(t: number): void {
@@ -142,7 +161,7 @@ export class JsonlLog {
   }
 }
 
-/** Entries for one finished run: an unbacked claim, a run error, both or neither. */
+/** Entries for one finished attempt: an unbacked claim, a run error, both or neither. */
 export function audit(
   run: { success: boolean; error?: string; messages: unknown },
   who: { agentId?: string; sessionKey?: string; runId?: string },
@@ -158,8 +177,9 @@ export function audit(
       entries.push({ ...base, kind: 'unbacked-claim', phrase: claim.phrase });
     }
   }
-  if (!run.success || run.error !== undefined) {
-    entries.push({ ...base, kind: 'run-error', error: (run.error ?? 'run ended without success').slice(0, 300) });
+  // Only an error counts: an abort, a yield or a timeout also ends with success false and no error.
+  if (run.error !== undefined && run.error !== '') {
+    entries.push({ ...base, kind: 'run-error', error: run.error.slice(0, 300) });
   }
   return entries;
 }

@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { chmod, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
@@ -50,6 +50,19 @@ test('a collision on every attempt returns an error result', async () => {
   await writeFile(join(dir, '2026-10-24-000000-aaaaaa-x.md'), 'kept');
   const r = await publishBrief('x', 'new', { briefsDir: dir, maxBriefChars: 100, now: () => new Date(Date.UTC(2026, 9, 24)), hex: () => 'aaaaaa' });
   assert.deepEqual(r, { ok: false, message: 'could not pick an unused file name' });
+  assert.deepEqual(await readdir(dir), ['2026-10-24-000000-aaaaaa-x.md'], 'no temporary file is left behind');
+});
+
+test('a symlink at the chosen name is never followed or replaced', async () => {
+  const dir = await temp();
+  const outside = await temp();
+  await writeFile(join(outside, 'target'), 'untouched');
+  await symlink(join(outside, 'target'), join(dir, '2026-10-24-000000-aaaaaa-x.md'));
+  const seq = ['aaaaaa', 'bbbbbb'];
+  const r = await publishBrief('x', 'new', { briefsDir: dir, maxBriefChars: 100, now: () => new Date(Date.UTC(2026, 9, 24)), hex: () => seq.shift() ?? 'cccccc' });
+  assert.ok(r.ok);
+  assert.equal(await readFile(join(outside, 'target'), 'utf8'), 'untouched');
+  assert.equal((await readdir(dir)).length, 2);
 });
 
 test('a 10,000-character brief round-trips exactly, with mode 0644', async () => {

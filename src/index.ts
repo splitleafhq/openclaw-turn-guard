@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { type OpenClawPluginApi, definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import { JsonlLog, ToolLog, audit } from './audit.ts';
 import { Budget } from './budget.ts';
@@ -32,8 +33,21 @@ function fail(message: string) {
   return { content: [{ type: 'text' as const, text: `${TOOL} failed: ${message}` }], details: { error: true } };
 }
 
-function sessionKeyId(sessionKey: string | undefined): string | undefined {
-  return sessionKey === undefined || sessionKey === '' ? undefined : `session:${sessionKey}`;
+/** Agent ids are compared lowercase, as OpenClaw normalizes them. */
+function listed(agentId: string | undefined, ids: string[]): boolean {
+  return agentId !== undefined && ids.some((id) => id.toLowerCase() === agentId.toLowerCase());
+}
+
+/**
+ * The call's id with its tool and arguments, so a server that reuses ids across different calls (index-style ids)
+ * can't make two lookups count as one.
+ */
+function callKey(toolCallId: string | undefined, toolName: string, params: unknown): string | undefined {
+  if (toolCallId === undefined) {
+    return undefined;
+  }
+  const args = createHash('sha256').update(JSON.stringify(params) ?? '').digest('hex').slice(0, 16);
+  return `${toolCallId}|${toolName}|${args}`;
 }
 
 export function registerTurnGuard(api: PluginHost): void {
@@ -46,7 +60,7 @@ export function registerTurnGuard(api: PluginHost): void {
   } else {
     api.registerTool(
       (ctx) => {
-        if (ctx.agentId === undefined || !config.publishAgents.includes(ctx.agentId)) {
+        if (!listed(ctx.agentId, config.publishAgents)) {
           return null;
         }
         return {
@@ -77,14 +91,16 @@ export function registerTurnGuard(api: PluginHost): void {
   api.on('before_tool_call', (event, ctx) => {
     // A throw or timeout here blocks the call (plugins/hooks/reference.md), so every path fails open.
     try {
-      if (ctx.agentId === undefined || !config.budgetAgents.includes(ctx.agentId) || !config.budgetTools.includes(event.toolName)) {
+      if (!listed(ctx.agentId, config.budgetAgents) || !config.budgetTools.includes(event.toolName)) {
         return undefined;
       }
-      const key = event.runId ?? ctx.runId ?? sessionKeyId(ctx.sessionKey);
+      // A run keeps its runId across attempts (compaction retries), so the count holds for the whole run. Without a
+      // runId the call is not counted: a shared bucket would let unrelated runs block each other.
+      const key = event.runId ?? ctx.runId;
       if (key === undefined) {
         return undefined;
       }
-      const reason = budget.check(key, event.toolCallId ?? ctx.toolCallId);
+      const reason = budget.check(key, callKey(event.toolCallId ?? ctx.toolCallId, event.toolName, event.params));
       return reason === undefined ? undefined : { block: true, blockReason: reason };
     } catch {
       return undefined;
@@ -102,21 +118,16 @@ export function registerTurnGuard(api: PluginHost): void {
   });
 
   if (!hasConversationAccess(api.config)) {
-    warn('hooks.allowConversationAccess is not set: agent_end is not registered, so the claim and error log and the budget reset are off');
+    warn('hooks.allowConversationAccess is not set: agent_end is not registered, so the claim and error log is off');
     return;
   }
+  // agent_end fires once per attempt, not per run (a compaction retry re-enters with the same runId), so it neither
+  // resets the budget nor drops the run's tool record: both age out after six hours.
   api.on('agent_end', async (event, ctx) => {
     try {
       const runId = event.runId ?? ctx.runId;
-      if (runId !== undefined) {
-        budget.end(runId);
-      }
-      const bySession = sessionKeyId(ctx.sessionKey);
-      if (bySession !== undefined) {
-        budget.end(bySession);
-      }
       const who = { agentId: ctx.agentId, sessionKey: ctx.sessionKey, runId };
-      await log.write(audit(event, who, tools.take(runId), new Date()));
+      await log.write(audit(event, who, tools.list(runId), new Date()));
     } catch {
       warn('agent_end check failed');
     }

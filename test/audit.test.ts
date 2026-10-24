@@ -102,11 +102,16 @@ test('without the conversation-access grant, agent_end is not registered and the
   assert.match(h.warnings.join('\n'), /allowConversationAccess/);
 });
 
-test('findClaim matches first-person past and perfect claims only', () => {
-  for (const yes of ["I've queued it", 'I have dispatched the job', 'We posted the update', 'I just sent that', 'i already scheduled it', 'I’ve posted it']) {
-    assert.ok(findClaim(yes), yes);
+test('findClaim matches done-action claims and not plans or other people', () => {
+  const yes = [
+    "I've queued it", 'I have dispatched the job', 'We posted the update', 'I just sent that', 'i already scheduled it', 'I’ve posted it',
+    "I've gone ahead and sent it", 'I went ahead and queued the job', "I've also forwarded it",
+    'The brief has been sent.', 'It is now queued for tonight', 'Queued.', 'Done. Sent!', 'Message sent.', 'Okay.\nSubmitted.',
+  ];
+  for (const t of yes) {
+    assert.ok(findClaim(t), t);
   }
-  for (const no of ["I'll send it", 'I can post that', 'Regis sent it', 'it was sent by Bruenor', 'I will have it scheduled', 'resent', 'I sentence you']) {
+  for (const no of ["I'll send it", 'I can post that', 'Regis sent it', 'it was sent by Bruenor', 'I will have it scheduled', 'resent', 'I sentence you', 'Sent to whom?']) {
     assert.equal(findClaim(no), undefined, no);
   }
 });
@@ -132,12 +137,12 @@ test('ToolLog drops runs idle for over six hours and caps one run at 200 calls',
   log.record('a', 'read', true);
   t += MAX_AGE_MS + 1;
   log.record('b', 'read', true);
-  assert.deepEqual(log.take('a'), []);
+  assert.deepEqual(log.list('a'), []);
   for (let i = 0; i < 250; i++) {
     log.record('b', 'read', true);
   }
-  assert.equal(log.take('b').length, 200);
-  assert.deepEqual(log.take(undefined), []);
+  assert.equal(log.list('b').length, 200);
+  assert.deepEqual(log.list(undefined), []);
 });
 
 test('config falls back for malformed values; the grant is read from plugins.entries', () => {
@@ -152,4 +157,25 @@ test('the default log file sits under the state directory', async () => {
   const h = install({ pluginConfig: { briefsDir: '/x' } });
   await h.fire('agent_end', { runId: 'r', messages: [], success: false, error: 'e' }, { agentId: 'a' });
   assert.match(h.warnings.join('\n'), /\/nonexistent-state\/logs\/turn-guard\.jsonl/);
+});
+
+test('a successful automations call (cron as hooks name it) backs "I scheduled it"', async () => {
+  const { h, lines } = await setup();
+  await tool(h, 'automations');
+  await end(h, {}, said('I scheduled it for 9.'));
+  assert.deepEqual(await lines(), []);
+});
+
+test('a later attempt of the same run still sees tools from the earlier attempt', async () => {
+  const { h, lines } = await setup();
+  await tool(h, 'sessions_send');
+  await end(h, {}, said('Working on it.'));
+  await end(h, {}, said('I sent it to the reader.'));
+  assert.deepEqual(await lines(), []);
+});
+
+test('an abort or timeout (success false, no error) is not logged as a run error', async () => {
+  const { h, lines } = await setup();
+  await end(h, { success: false });
+  assert.deepEqual(await lines(), []);
 });

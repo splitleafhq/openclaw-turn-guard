@@ -15,4 +15,4 @@ Set under `plugins.entries.turn-guard.config`. The manifest schema (`openclaw.pl
 
 The default agent ids are the documented defaults only; the code names no agent anywhere else.
 
-`plugins.entries.turn-guard.hooks.allowConversationAccess: true` is a separate operator setting, outside `config`. Without it the turn log and the `agent_end` budget reset are off.
+`plugins.entries.turn-guard.hooks.allowConversationAccess: true` is a separate operator setting, outside `config`. Without it the turn log is off; the budget works either way.

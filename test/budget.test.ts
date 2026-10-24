@@ -39,27 +39,32 @@ test('an agent outside budgetAgents and a tool outside the budget are never coun
   assert.equal(await h.fire('before_tool_call', call('web_search', 'c1', 'r'), {}), undefined);
 });
 
-test('without a runId the count falls to the session key; without both, calls are not counted', async () => {
+test('without a runId, calls are not counted', async () => {
   const h = host({ budget: 1 });
-  const c = ctx('research', undefined, 'agent:session-1');
-  assert.equal(await h.fire('before_tool_call', call('web_search', 'a'), c), undefined);
-  assert.deepEqual(await h.fire('before_tool_call', call('web_search', 'b'), c), blocked);
-  assert.equal(await h.fire('before_tool_call', call('web_search', 'a'), ctx('research', undefined, 'agent:session-2')), undefined);
   for (let i = 0; i < 5; i++) {
-    assert.equal(await h.fire('before_tool_call', call('web_search', `n${i}`), ctx('research')), undefined);
+    assert.equal(await h.fire('before_tool_call', call('web_search', `n${i}`), ctx('research', undefined, 'agent:session-1')), undefined);
   }
 });
 
-test('agent_end clears the run, so a retry of that run starts fresh', async () => {
+test('agent_end ends an attempt, not the run: a retry with the same runId keeps its count', async () => {
   const h = host({ budget: 1 });
   await h.fire('before_tool_call', call('web_search', 'a', 'r'), ctx('research', 'r'));
+  await h.fire('agent_end', { messages: [], success: false }, ctx('research', 'r'));
   assert.deepEqual(await h.fire('before_tool_call', call('web_search', 'b', 'r'), ctx('research', 'r')), blocked);
-  await h.fire('agent_end', { runId: 'r', messages: [], success: true }, ctx('research', 'r'));
-  assert.equal(await h.fire('before_tool_call', call('web_search', 'c', 'r'), ctx('research', 'r')), undefined);
-  const c = ctx('research', undefined, 'agent:s');
-  await h.fire('before_tool_call', call('web_search', 'a'), c);
-  await h.fire('agent_end', { messages: [], success: true }, c);
-  assert.equal(await h.fire('before_tool_call', call('web_search', 'b'), c), undefined);
+});
+
+test('a reused toolCallId with different arguments counts again', async () => {
+  const h = host({ budget: 1 });
+  const at = (q: string) => ({ toolName: 'web_search', params: { query: q }, toolCallId: 'call_0', runId: 'r' });
+  assert.equal(await h.fire('before_tool_call', at('one'), ctx('research', 'r')), undefined);
+  assert.equal(await h.fire('before_tool_call', at('one'), ctx('research', 'r')), undefined);
+  assert.deepEqual(await h.fire('before_tool_call', at('two'), ctx('research', 'r')), blocked);
+});
+
+test('agent ids match without regard to case', async () => {
+  const h = host({ budget: 1, budgetAgents: ['Research'] });
+  await h.fire('before_tool_call', call('web_search', 'a', 'r'), ctx('research', 'r'));
+  assert.deepEqual(await h.fire('before_tool_call', call('web_search', 'b', 'r'), ctx('research', 'r')), blocked);
 });
 
 test('entries older than six hours are evicted on the next call, with no timer', () => {

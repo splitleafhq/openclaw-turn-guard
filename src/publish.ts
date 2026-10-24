@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, open } from 'node:fs/promises';
+import { link, mkdir, open, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export type PublishResult = { ok: true; path: string; chars: number } | { ok: false; message: string };
@@ -40,24 +40,32 @@ function reason(error: unknown): string {
   return typeof code === 'string' ? `the write failed (${code})` : 'the write failed';
 }
 
-/** Creates the file or returns undefined when the name is taken. `wx` refuses to overwrite or follow a symlink. */
-async function create(path: string, text: string): Promise<boolean> {
-  let handle;
+/**
+ * Writes the whole text to a hidden temporary file, then links it to the final name, so a reader never sees a part
+ * file. `wx` refuses to overwrite or follow a symlink, and `link` fails with EEXIST when the name is taken. Returns
+ * false when it is.
+ */
+async function create(dir: string, name: string, text: string): Promise<boolean> {
+  const temp = join(dir, `.${name}.${randomBytes(6).toString('hex')}.tmp`);
+  const handle = await open(temp, 'wx', 0o644);
   try {
-    handle = await open(path, 'wx', 0o644);
+    try {
+      await handle.chmod(0o644);
+      await handle.writeFile(text, 'utf8');
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await link(temp, join(dir, name));
+    return true;
   } catch (error) {
     if (errno(error) === 'EEXIST') {
       return false;
     }
     throw error;
-  }
-  try {
-    await handle.chmod(0o644);
-    await handle.writeFile(text, 'utf8');
   } finally {
-    await handle.close();
+    await unlink(temp).catch(() => undefined);
   }
-  return true;
 }
 
 /** The file name is built here from the clock, a random suffix and the slug, so the caller never supplies a path. */
@@ -77,7 +85,7 @@ export async function publishBrief(topic: unknown, text: unknown, options: Publi
       return { ok: false, message: 'could not pick an unused file name' };
     }
     const name = `${stamp(now())}-${hex()}-${slug}.md`;
-    return (await create(join(options.briefsDir, name), text))
+    return (await create(options.briefsDir, name, text))
       ? { ok: true, path: `${prefix}/${name}`, chars: text.length }
       : attempt(left - 1);
   };
