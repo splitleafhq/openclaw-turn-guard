@@ -1,7 +1,9 @@
 import { mkdir } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
 import { root } from 'openclaw/plugin-sdk/security-runtime';
-import { MAX_AGE_MS } from './budget.ts';
+
+/** Tool records for a run are dropped this long after its last call. */
+export const MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 const VERBS = 'sent|queued|dispatched|scheduled|posted|forwarded|delivered|submitted';
 const ADVERBS = '(?:(?:just|already|now|also|successfully|gone ahead and|went ahead and)\\s+)*';

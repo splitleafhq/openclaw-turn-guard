@@ -3,8 +3,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { ToolLog, findClaim, finalAssistantText } from '../src/audit.ts';
-import { MAX_AGE_MS } from '../src/budget.ts';
+import { MAX_AGE_MS, ToolLog, findClaim, finalAssistantText } from '../src/audit.ts';
 import { hasConversationAccess, resolveConfig } from '../src/config.ts';
 import { install } from './fixtures.ts';
 
@@ -98,7 +97,8 @@ test('an unwritable log file warns and does not throw', async () => {
 test('without the conversation-access grant, agent_end is not registered and the log stays off', async () => {
   const { h } = await setup(false);
   assert.equal(h.hasHook('agent_end'), false);
-  assert.equal(h.hasHook('before_tool_call'), true);
+  assert.equal(h.hasHook('after_tool_call'), true);
+  assert.equal(h.hasHook('before_tool_call'), false);
   assert.match(h.warnings.join('\n'), /allowConversationAccess/);
 });
 
@@ -146,9 +146,9 @@ test('ToolLog drops runs idle for over six hours and caps one run at 200 calls',
 });
 
 test('config falls back for malformed values; the grant is read from plugins.entries', () => {
-  const c = resolveConfig({ budget: 0, publishAgents: 'x', maxBriefChars: 1.5, briefsDir: '' });
-  assert.deepEqual([c.budget, c.publishAgents, c.maxBriefChars, c.briefsDir], [16, ['research'], 60000, undefined]);
-  assert.equal(resolveConfig(null).budget, 16);
+  const c = resolveConfig({ publishAgents: 'x', maxBriefChars: 1.5, briefsDir: '' });
+  assert.deepEqual([c.publishAgents, c.maxBriefChars, c.briefsDir], [['research'], 60000, undefined]);
+  assert.equal(resolveConfig(null).maxBriefChars, 60000);
   assert.equal(hasConversationAccess(null), false);
   assert.equal(hasConversationAccess({ plugins: { entries: { 'turn-guard': { hooks: { allowConversationAccess: true } } } } }), true);
 });

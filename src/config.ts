@@ -1,15 +1,10 @@
 export const PLUGIN_ID = 'turn-guard';
-export const BUDGET_MESSAGE =
-  "Budget spent: no more searches or fetches this task. Publish the brief from your notes and say what you didn't check.";
 
 export interface TurnGuardConfig {
   briefsDir?: string;
   publishedPathPrefix?: string;
   publishAgents: string[];
   maxBriefChars: number;
-  budgetAgents: string[];
-  budget: number;
-  budgetTools: string[];
   logFile?: string;
 }
 
@@ -37,9 +32,6 @@ export function resolveConfig(raw: unknown): TurnGuardConfig {
     publishedPathPrefix: text(c.publishedPathPrefix),
     publishAgents: strings(c.publishAgents, ['research']),
     maxBriefChars: count(c.maxBriefChars, 60000),
-    budgetAgents: strings(c.budgetAgents, ['research']),
-    budget: count(c.budget, 16),
-    budgetTools: strings(c.budgetTools, ['web_search', 'web_fetch']),
     logFile: text(c.logFile),
   };
 }

@@ -1,10 +1,9 @@
 # openclaw-turn-guard
 
-An [OpenClaw](https://docs.openclaw.ai) plugin (id `turn-guard`) with three small guards for a research agent:
+An [OpenClaw](https://docs.openclaw.ai) plugin (id `turn-guard`) with two parts for a research agent and the agents around it:
 
 1. **`publish_brief` tool.** Saves a finished brief to a host folder and returns the path the reader sees.
-2. **Lookup budget.** Caps `web_search` and `web_fetch` together per run, then tells the agent to publish from its notes.
-3. **Turn log.** Logs, never blocks, a final answer that claims "I sent it" with no matching tool call, and runs that ended in an error.
+2. **Turn log.** Logs, never blocks, a final answer that claims "I sent it" with no matching tool call, and runs that ended in an error.
 
 **Status:** built and unit-tested against OpenClaw 2026.10.5. Not installed anywhere, not published. What a live gateway still has to confirm is in [docs/verification.md](docs/verification.md).
 
@@ -21,20 +20,7 @@ Runs in the gateway process and writes `text` to `<briefsDir>/<YYYY-MM-DD>-<HHMM
 
 Docs relied on: tool registration and the matching `contracts.tools` entry, `docs/plugins/building-plugins.md` (Register tools); a factory may return `null`, same section.
 
-### 2. Budget
-
-`before_tool_call` counts `web_search` and `web_fetch` together per run for agents in `budgetAgents` (default `["research"]`, `budget` 16). The 17th call is blocked with:
-
-> Budget spent: no more searches or fetches this task. Publish the brief from your notes and say what you didn't check.
-
-- A run is keyed by `runId`, which stays the same across a run's attempts (compaction retries), so the count holds for the whole run. A repeated call, the same `toolCallId` with the same tool and arguments, counts once; a reused id with other arguments counts again.
-- No `runId`: the call is not counted, because a shared bucket would let unrelated runs block each other. The handler fails open on any error, because a throw blocks the call.
-- `agent_end` ends an attempt, not a run, so it does not reset the count. Counters are dropped lazily on each call when idle over 6 hours. There are no timers.
-- Agent ids match without regard to case.
-
-Docs relied on: `before_tool_call` fields and `block`/`blockReason`, `docs/plugins/hooks/tool-policy.md`; fail-closed on throw or timeout, `docs/plugins/hooks/reference.md`; `runId` on hooks and context, `docs/plugins/hooks/prompt-and-session.md`.
-
-### 3. Turn log
+### 2. Turn log
 
 `agent_end` handler, registered only when the operator sets `plugins.entries.turn-guard.hooks.allowConversationAccess: true` (without the grant OpenClaw blocks the hook for a non-bundled plugin; `docs/plugins/hooks/reference.md`, conversation access). Without it the plugin warns once and skips this part. `agent_end` fires once per attempt, so a run retried after compaction is checked at each attempt, with every tool call of the run so far.
 

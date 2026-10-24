@@ -8,11 +8,8 @@ Set under `plugins.entries.turn-guard.config`. The manifest schema (`openclaw.pl
 | `publishedPathPrefix` | host path | The folder as the reader of the returned path sees it. |
 | `publishAgents` | `["research"]` | Agent ids that get `publish_brief`. |
 | `maxBriefChars` | `60000` | Longest accepted brief, in characters. |
-| `budgetAgents` | `["research"]` | Agent ids whose lookups are capped. |
-| `budget` | `16` | Lookups per run, `web_search` and `web_fetch` together. |
-| `budgetTools` | `["web_search", "web_fetch"]` | Tools that count. |
 | `logFile` | `<state dir>/logs/turn-guard.jsonl` | Log of unbacked claims and run errors, mode 0600. Needs `hooks.allowConversationAccess`. |
 
 The default agent ids are the documented defaults only; the code names no agent anywhere else.
 
-`plugins.entries.turn-guard.hooks.allowConversationAccess: true` is a separate operator setting, outside `config`. Without it the turn log is off; the budget works either way.
+`plugins.entries.turn-guard.hooks.allowConversationAccess: true` is a separate operator setting, outside `config`. Without it the turn log is off; `publish_brief` works either way.

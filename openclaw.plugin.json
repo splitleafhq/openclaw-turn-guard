@@ -1,7 +1,7 @@
 {
   "id": "turn-guard",
   "name": "Turn Guard",
-  "description": "Caps an agent's web searches and fetches per run, publishes its finished briefs to a host folder, and logs unbacked \"I sent it\" claims and run errors. Logging is read-only: it never blocks or rewrites a turn.",
+  "description": "Publishes an agent's finished briefs to a host folder, and logs unbacked \"I sent it\" claims and run errors. Logging is read-only: it never blocks or rewrites a turn.",
   "categories": [
     "research"
   ],
@@ -23,9 +23,6 @@
     "publishedPathPrefix": { "label": "Published path prefix", "help": "The folder as the reader of the path sees it, such as a bind-mount path.", "advanced": true },
     "publishAgents": { "label": "Agents with publish_brief", "advanced": true },
     "maxBriefChars": { "label": "Longest brief (characters)", "advanced": true },
-    "budgetAgents": { "label": "Agents with a lookup budget", "advanced": true },
-    "budget": { "label": "Lookups per run", "help": "Searches and fetches allowed per run, counted together." },
-    "budgetTools": { "label": "Budgeted tools", "advanced": true },
     "logFile": { "label": "Log file", "help": "Needs hooks.allowConversationAccess.", "advanced": true }
   },
   "configSchema": {
@@ -57,26 +54,6 @@
         "maximum": 1000000,
         "description": "Longest brief publish_brief accepts, in characters.",
         "default": 60000
-      },
-      "budgetAgents": {
-        "type": "array",
-        "items": { "type": "string", "minLength": 1 },
-        "description": "Agent ids whose web lookups are capped per run.",
-        "default": ["research"]
-      },
-      "budget": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 1000,
-        "description": "Searches and fetches allowed per run, counted together.",
-        "default": 16
-      },
-      "budgetTools": {
-        "type": "array",
-        "items": { "type": "string", "minLength": 1 },
-        "minItems": 1,
-        "description": "Tools that count toward the budget.",
-        "default": ["web_search", "web_fetch"]
       },
       "logFile": {
         "type": "string",

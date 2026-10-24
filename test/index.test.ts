@@ -16,6 +16,6 @@ test('the manifest id, tool contract and defaults match the code', async () => {
   assert.deepEqual(manifest.contracts, { tools: ['publish_brief'] });
   const schema = manifest.configSchema;
   assert.ok(typeof schema === 'object' && schema !== null && 'properties' in schema && typeof schema.properties === 'object' && schema.properties !== null);
-  assert.ok('budget' in schema.properties && typeof schema.properties.budget === 'object' && schema.properties.budget !== null);
-  assert.equal('default' in schema.properties.budget && schema.properties.budget.default, 16);
+  assert.ok('maxBriefChars' in schema.properties && typeof schema.properties.maxBriefChars === 'object' && schema.properties.maxBriefChars !== null);
+  assert.equal('default' in schema.properties.maxBriefChars && schema.properties.maxBriefChars.default, 60000);
 });

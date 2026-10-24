@@ -1,9 +1,7 @@
-import { createHash } from 'node:crypto';
 import { type OpenClawPluginApi, definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import { textResult } from 'openclaw/plugin-sdk/tool-results';
 import { type Static, Type } from 'typebox';
 import { JsonlLog, ToolLog, audit } from './audit.ts';
-import { Budget } from './budget.ts';
 import { PLUGIN_ID, hasConversationAccess, resolveConfig } from './config.ts';
 import { publishBrief } from './publish.ts';
 
@@ -33,18 +31,6 @@ function fail(message: string) {
 /** Agent ids are compared lowercase, as OpenClaw normalizes them. */
 function listed(agentId: string | undefined, ids: string[]): boolean {
   return agentId !== undefined && ids.some((id) => id.toLowerCase() === agentId.toLowerCase());
-}
-
-/**
- * The call's id with its tool and arguments, so a server that reuses ids across different calls (index-style ids)
- * can't make two lookups count as one.
- */
-function callKey(toolCallId: string | undefined, toolName: string, params: unknown): string | undefined {
-  if (toolCallId === undefined) {
-    return undefined;
-  }
-  const args = createHash('sha256').update(JSON.stringify(params) ?? '').digest('hex').slice(0, 16);
-  return `${toolCallId}|${toolName}|${args}`;
 }
 
 export function registerTurnGuard(api: PluginHost): void {
@@ -83,26 +69,6 @@ export function registerTurnGuard(api: PluginHost): void {
     );
   }
 
-  const budget = new Budget(config.budget);
-  api.on('before_tool_call', (event, ctx) => {
-    // A throw or timeout here blocks the call (plugins/hooks/reference.md), so every path fails open.
-    try {
-      if (!listed(ctx.agentId, config.budgetAgents) || !config.budgetTools.includes(event.toolName)) {
-        return undefined;
-      }
-      // A run keeps its runId across attempts (compaction retries), so the count holds for the whole run. Without a
-      // runId the call is not counted: a shared bucket would let unrelated runs block each other.
-      const key = event.runId ?? ctx.runId;
-      if (key === undefined) {
-        return undefined;
-      }
-      const reason = budget.check(key, callKey(event.toolCallId ?? ctx.toolCallId, event.toolName, event.params));
-      return reason === undefined ? undefined : { block: true, blockReason: reason };
-    } catch {
-      return undefined;
-    }
-  });
-
   const tools = new ToolLog();
   const logFile = config.logFile ?? `${api.runtime.state.resolveStateDir(process.env)}/logs/turn-guard.jsonl`;
   const log = new JsonlLog(logFile, warn);
@@ -117,8 +83,8 @@ export function registerTurnGuard(api: PluginHost): void {
     warn('hooks.allowConversationAccess is not set: agent_end is not registered, so the claim and error log is off');
     return;
   }
-  // agent_end fires once per attempt, not per run (a compaction retry re-enters with the same runId), so it neither
-  // resets the budget nor drops the run's tool record: both age out after six hours.
+  // agent_end fires once per attempt, not per run (a compaction retry re-enters with the same runId), so it doesn't
+  // drop the run's tool record: records age out after six hours.
   api.on('agent_end', async (event, ctx) => {
     try {
       const runId = event.runId ?? ctx.runId;
@@ -133,6 +99,6 @@ export function registerTurnGuard(api: PluginHost): void {
 export default definePluginEntry({
   id: PLUGIN_ID,
   name: 'Turn Guard',
-  description: 'Caps web lookups per run, publishes briefs to a host folder, and logs unbacked "I sent it" claims and run errors.',
+  description: 'Publishes briefs to a host folder, and logs unbacked "I sent it" claims and run errors.',
   register: registerTurnGuard,
 });

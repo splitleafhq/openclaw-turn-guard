@@ -2,8 +2,8 @@
 
 Rules for working in this repo.
 
-1. Never block anything except a web lookup past the budget. The claim and error checks only log; they never block, rewrite or retry a turn.
-2. Fail open: a throw or timeout in `before_tool_call` blocks the call (OpenClaw 2026.10.5, `docs/plugins/hooks/reference.md`), so that handler catches everything and returns `undefined`. `publish_brief` returns an error result and never throws.
+1. Never block anything. The claim and error checks only log; they never block, rewrite or retry a turn.
+2. Fail open: hook handlers catch everything. `publish_brief` returns an error result and never throws.
 3. `publish_brief` takes no path from the caller. The file name is built in code, created through OpenClaw's `root().create` (exclusive, atomic), and written only under `briefsDir`.
 4. Log only what the log is for: time, agent id, session key, run id, a matched phrase of at most 120 characters, tool names with ok or error. No transcripts. The log file is mode 0600.
 5. Hard-code no model name or context size. Agent ids appear only as documented config defaults.
