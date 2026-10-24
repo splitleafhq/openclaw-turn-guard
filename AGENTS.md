@@ -4,7 +4,7 @@ Rules for working in this repo.
 
 1. Never block anything except a web lookup past the budget. The claim and error checks only log; they never block, rewrite or retry a turn.
 2. Fail open: a throw or timeout in `before_tool_call` blocks the call (OpenClaw 2026.10.5, `docs/plugins/hooks/reference.md`), so that handler catches everything and returns `undefined`. `publish_brief` returns an error result and never throws.
-3. `publish_brief` takes no path from the caller. The file name is built in code, created with `wx`, and written only under `briefsDir`.
+3. `publish_brief` takes no path from the caller. The file name is built in code, created through OpenClaw's `root().create` (exclusive, atomic), and written only under `briefsDir`.
 4. Log only what the log is for: time, agent id, session key, run id, a matched phrase of at most 120 characters, tool names with ok or error. No transcripts. The log file is mode 0600.
 5. Hard-code no model name or context size. Agent ids appear only as documented config defaults.
 6. Follow OpenClaw's own conventions for names and locations (camelCase keys with unit suffixes, the state directory OpenClaw resolves); where none exists, leave the setting unset rather than invent a default.
@@ -14,7 +14,7 @@ Rules for working in this repo.
 10. Name a test for the failure it prevents.
 11. Cite the OpenClaw version, and a docs page or source file, for any claim about OpenClaw behaviour, and label anything not yet checked on a live gateway as unverified in `docs/verification.md`.
 12. Pin every tool and action to an exact version or commit.
-13. Keep runtime dependencies at zero; import only `node:` built-ins and `openclaw/plugin-sdk/*`.
+13. Keep runtime dependencies to `typebox`, pinned to the version OpenClaw's plugin docs show; otherwise import only `node:` built-ins and `openclaw/plugin-sdk/*`. Use OpenClaw's helper where one exists.
 14. A comment states a constraint the code can't show, never what the next line does.
 15. Write terse, factual prose.
 16. Commit on the user's behalf; creating a GitHub repo, pushing, merging, tagging, releasing and installing each need their own approval.

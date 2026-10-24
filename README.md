@@ -12,7 +12,7 @@ An [OpenClaw](https://docs.openclaw.ai) plugin (id `turn-guard`) with three smal
 
 ### 1. `publish_brief({ topic, text })`
 
-Runs in the gateway process and writes `text` to `<briefsDir>/<YYYY-MM-DD>-<HHMMSS>-<6 hex>-<slug>.md` (UTC, mode 0644, folder created 0755). The file is created with the exclusive flag, so nothing is overwritten and a symlink at the name is refused. The slug is the topic lowercased to `[a-z0-9-]`, at most 40 characters, `brief` if nothing is left. The caller never supplies a path.
+Runs in the gateway process and writes `text` to `<briefsDir>/<YYYY-MM-DD>-<HHMMSS>-<6 hex>-<slug>.md` (UTC, mode 0644, folder created 0755). The file is created through OpenClaw's `root().create` (exclusive, atomic), so nothing is overwritten and a symlink at the name is refused. The slug is the topic lowercased to `[a-z0-9-]`, at most 40 characters, `brief` if nothing is left. The caller never supplies a path.
 
 - Empty text, or text over `maxBriefChars` (60,000), returns an error result.
 - A write failure returns an error result with a short message, not a throw.

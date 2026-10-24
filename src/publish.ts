@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { link, mkdir, open, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { FsSafeError, root } from 'openclaw/plugin-sdk/security-runtime';
 
 export type PublishResult = { ok: true; path: string; chars: number } | { ok: false; message: string };
 
@@ -41,42 +41,31 @@ function reason(error: unknown): string {
 }
 
 /**
- * Writes the whole text to a hidden temporary file, then links it to the final name, so a reader never sees a part
- * file. `wx` refuses to overwrite or follow a symlink, and `link` fails with EEXIST when the name is taken. Returns
- * false when it is.
+ * Creates the file through OpenClaw's `root().create` with `atomic`, which publishes the finished file without ever
+ * replacing an existing entry. A taken name, including one held by a symlink, is reported as `already-exists` or
+ * `path-alias`. Returns false when the name is taken.
  */
 async function create(dir: string, name: string, text: string): Promise<boolean> {
-  const temp = join(dir, `.${name}.${randomBytes(6).toString('hex')}.tmp`);
-  const handle = await open(temp, 'wx', 0o644);
   try {
-    try {
-      await handle.chmod(0o644);
-      await handle.writeFile(text, 'utf8');
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    await link(temp, join(dir, name));
+    await (await root(dir)).create(name, text, { atomic: true, mode: 0o644 });
     return true;
   } catch (error) {
-    if (errno(error) === 'EEXIST') {
+    if (error instanceof FsSafeError && (error.code === 'already-exists' || error.code === 'path-alias')) {
       return false;
     }
     throw error;
-  } finally {
-    await unlink(temp).catch(() => undefined);
   }
 }
 
 /** The file name is built here from the clock, a random suffix and the slug, so the caller never supplies a path. */
-export async function publishBrief(topic: unknown, text: unknown, options: PublishOptions): Promise<PublishResult> {
-  if (typeof text !== 'string' || text.trim() === '') {
+export async function publishBrief(topic: string, text: string, options: PublishOptions): Promise<PublishResult> {
+  if (text.trim() === '') {
     return { ok: false, message: 'text is empty' };
   }
   if (text.length > options.maxBriefChars) {
     return { ok: false, message: `text is ${text.length} characters; the limit is ${options.maxBriefChars}` };
   }
-  const slug = slugify(typeof topic === 'string' ? topic : '');
+  const slug = slugify(topic);
   const now = options.now ?? (() => new Date());
   const hex = options.hex ?? (() => randomBytes(3).toString('hex'));
   const prefix = (options.publishedPathPrefix ?? options.briefsDir).replace(/\/+$/, '');

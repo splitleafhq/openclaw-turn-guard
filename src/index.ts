@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { type OpenClawPluginApi, definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
+import { textResult } from 'openclaw/plugin-sdk/tool-results';
+import { type Static, Type } from 'typebox';
 import { JsonlLog, ToolLog, audit } from './audit.ts';
 import { Budget } from './budget.ts';
 import { PLUGIN_ID, hasConversationAccess, resolveConfig } from './config.ts';
@@ -19,18 +21,13 @@ export interface PluginHost {
 
 const TOOL = 'publish_brief';
 
-const PARAMETERS = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['topic', 'text'],
-  properties: {
-    topic: { type: 'string', description: 'Short subject of the brief. It only names the file.' },
-    text: { type: 'string', description: 'The whole brief, as Markdown.' },
-  },
-};
+const PARAMETERS = Type.Object({
+  topic: Type.String({ description: 'Short subject of the brief. It only names the file.' }),
+  text: Type.String({ description: 'The whole brief, as Markdown.' }),
+});
 
 function fail(message: string) {
-  return { content: [{ type: 'text' as const, text: `${TOOL} failed: ${message}` }], details: { error: true } };
+  return textResult(`${TOOL} failed: ${message}`, { status: 'failed' });
 }
 
 /** Agent ids are compared lowercase, as OpenClaw normalizes them. */
@@ -68,9 +65,8 @@ export function registerTurnGuard(api: PluginHost): void {
           label: 'Publish brief',
           description: 'Save a finished research brief as a Markdown file. Returns the file path. Call it once, at the end.',
           parameters: PARAMETERS,
-          async execute(_id: string, params: unknown) {
-            const p = typeof params === 'object' && params !== null ? params : {};
-            const result = await publishBrief('topic' in p ? p.topic : undefined, 'text' in p ? p.text : undefined, {
+          async execute(_id: string, params: Static<typeof PARAMETERS>) {
+            const result = await publishBrief(params.topic, params.text, {
               briefsDir,
               publishedPathPrefix: config.publishedPathPrefix,
               maxBriefChars: config.maxBriefChars,
@@ -79,7 +75,7 @@ export function registerTurnGuard(api: PluginHost): void {
               warn(`publish failed: ${result.message}`);
               return fail(result.message);
             }
-            return { content: [{ type: 'text' as const, text: result.path }], details: { path: result.path, chars: result.chars } };
+            return textResult(result.path, { path: result.path, chars: result.chars });
           },
         };
       },

@@ -1,5 +1,6 @@
-import { appendFile, chmod, mkdir } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { basename, dirname } from 'node:path';
+import { root } from 'openclaw/plugin-sdk/security-runtime';
 import { MAX_AGE_MS } from './budget.ts';
 
 const VERBS = 'sent|queued|dispatched|scheduled|posted|forwarded|delivered|submitted';
@@ -137,7 +138,7 @@ export interface Entry {
   tools: ToolRecord[];
 }
 
-/** Appends JSON lines at mode 0600. Never throws: a log failure must not touch the run. */
+/** Appends JSON lines through OpenClaw's `root().append`, creating the file at mode 0600. Never throws: a log failure must not touch the run. */
 export class JsonlLog {
   private readonly file: string;
   private readonly warn: (message: string) => void;
@@ -153,8 +154,7 @@ export class JsonlLog {
     }
     try {
       await mkdir(dirname(this.file), { recursive: true, mode: 0o700 });
-      await appendFile(this.file, entries.map((e) => `${JSON.stringify(e)}\n`).join(''), { mode: 0o600 });
-      await chmod(this.file, 0o600);
+      await (await root(dirname(this.file))).append(basename(this.file), entries.map((e) => `${JSON.stringify(e)}\n`).join(''), { mode: 0o600 });
     } catch {
       this.warn(`could not write ${this.file}`);
     }

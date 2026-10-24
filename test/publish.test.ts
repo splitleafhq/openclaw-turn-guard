@@ -93,7 +93,7 @@ test('an unwritable briefsDir returns an error result and does not throw', async
   const r = await t.execute('c1', { topic: 'Catti-brie', text: 'a brief' });
   await chmod(dir, 0o700);
   assert.match(text(r), /^publish_brief failed: the write failed/);
-  assert.deepEqual(r.details, { error: true });
+  assert.deepEqual(r.details, { status: 'failed' });
 });
 
 test('a briefsDir that is a file returns an error result', async () => {
@@ -103,10 +103,10 @@ test('a briefsDir that is a file returns an error result', async () => {
   assert.equal(r.ok, false);
 });
 
-test('empty, whitespace-only and non-string text are rejected', async () => {
+test('empty and whitespace-only text are rejected', async () => {
   const dir = await temp();
   const t = await tool(dir);
-  for (const bad of ['', '   \n', 5, undefined]) {
+  for (const bad of ['', '   \n']) {
     const r = await t.execute('c1', { topic: 't', text: bad });
     assert.match(text(r), /text is empty/);
   }
@@ -129,11 +129,10 @@ test('publishedPathPrefix replaces the host path in the result, without a double
   assert.equal(text(r), `/mnt/briefs/${name}`);
 });
 
-test('a missing or non-string topic falls back to the "brief" slug; params that are not an object are rejected', async () => {
+test('a topic with no usable characters falls back to the "brief" slug', async () => {
   const dir = await temp();
   const t = await tool(dir);
-  await t.execute('c1', { text: 'a brief' });
-  await t.execute('c2', null);
+  await t.execute('c1', { topic: '研究', text: 'a brief' });
   const names = await readdir(dir);
   assert.equal(names.length, 1);
   assert.match(defined(names[0]), /-brief\.md$/);

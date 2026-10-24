@@ -3,7 +3,7 @@
   "name": "Turn Guard",
   "description": "Caps an agent's web searches and fetches per run, publishes its finished briefs to a host folder, and logs unbacked \"I sent it\" claims and run errors. Logging is read-only: it never blocks or rewrites a turn.",
   "categories": [
-    "agents"
+    "research"
   ],
   "contracts": {
     "tools": [
@@ -17,6 +17,16 @@
   },
   "activation": {
     "onStartup": true
+  },
+  "uiHints": {
+    "briefsDir": { "label": "Briefs folder", "help": "Host folder publish_brief writes to. Created if missing." },
+    "publishedPathPrefix": { "label": "Published path prefix", "help": "The folder as the reader of the path sees it, such as a bind-mount path.", "advanced": true },
+    "publishAgents": { "label": "Agents with publish_brief", "advanced": true },
+    "maxBriefChars": { "label": "Longest brief (characters)", "advanced": true },
+    "budgetAgents": { "label": "Agents with a lookup budget", "advanced": true },
+    "budget": { "label": "Lookups per run", "help": "Searches and fetches allowed per run, counted together." },
+    "budgetTools": { "label": "Budgeted tools", "advanced": true },
+    "logFile": { "label": "Log file", "help": "Needs hooks.allowConversationAccess.", "advanced": true }
   },
   "configSchema": {
     "type": "object",
