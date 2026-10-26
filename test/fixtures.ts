@@ -20,9 +20,20 @@ export function defined<T>(value: T | undefined | null): T {
 export interface Options {
   pluginConfig: Record<string, unknown>;
   grant?: boolean;
+  runtime?: PluginHost['runtime'];
 }
 
-export function install({ pluginConfig, grant = true }: Options) {
+/** Like OpenClaw's runtime during CLI-metadata registration: reading any property throws. */
+export function unavailableRuntime(): PluginHost['runtime'] {
+  const target: PluginHost['runtime'] = { state: { resolveStateDir: () => '' } };
+  return new Proxy(target, {
+    get() {
+      throw new Error('runtime is intentionally unavailable during "cli-metadata" registration');
+    },
+  });
+}
+
+export function install({ pluginConfig, grant = true, runtime = { state: { resolveStateDir: () => '/nonexistent-state' } } }: Options) {
   const hooks = new Map<string, Handler>();
   const factories: ((ctx: { agentId?: string }) => unknown)[] = [];
   const warnings: string[] = [];
@@ -40,7 +51,7 @@ export function install({ pluginConfig, grant = true }: Options) {
         factories.push((ctx) => tool(ctx));
       }
     },
-    runtime: { state: { resolveStateDir: () => '/nonexistent-state' } },
+    runtime,
   };
   registerTurnGuard(api);
   return {

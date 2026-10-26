@@ -142,10 +142,10 @@ export interface Entry {
 
 /** Appends JSON lines through OpenClaw's `root().append`, creating the file at mode 0600. Never throws: a log failure must not touch the run. */
 export class JsonlLog {
-  private readonly file: string;
+  private readonly file: () => string;
   private readonly warn: (message: string) => void;
 
-  constructor(file: string, warn: (message: string) => void) {
+  constructor(file: () => string, warn: (message: string) => void) {
     this.file = file;
     this.warn = warn;
   }
@@ -154,11 +154,13 @@ export class JsonlLog {
     if (entries.length === 0) {
       return;
     }
+    let file = 'the log file';
     try {
-      await mkdir(dirname(this.file), { recursive: true, mode: 0o700 });
-      await (await root(dirname(this.file))).append(basename(this.file), entries.map((e) => `${JSON.stringify(e)}\n`).join(''), { mode: 0o600 });
+      file = this.file();
+      await mkdir(dirname(file), { recursive: true, mode: 0o700 });
+      await (await root(dirname(file))).append(basename(file), entries.map((e) => `${JSON.stringify(e)}\n`).join(''), { mode: 0o600 });
     } catch {
-      this.warn(`could not write ${this.file}`);
+      this.warn(`could not write ${file}`);
     }
   }
 }

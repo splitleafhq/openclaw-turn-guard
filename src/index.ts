@@ -70,8 +70,8 @@ export function registerTurnGuard(api: PluginHost): void {
   }
 
   const tools = new ToolLog();
-  const logFile = config.logFile ?? `${api.runtime.state.resolveStateDir(process.env)}/logs/turn-guard.jsonl`;
-  const log = new JsonlLog(logFile, warn);
+  // The runtime throws during CLI-metadata registration, so the state directory is resolved at write time.
+  const log = new JsonlLog(() => config.logFile ?? `${api.runtime.state.resolveStateDir(process.env)}/logs/turn-guard.jsonl`, warn);
   api.on('after_tool_call', (event, ctx) => {
     const runId = event.runId ?? ctx.runId;
     if (runId !== undefined) {

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { MAX_AGE_MS, ToolLog, findClaim, finalAssistantText } from '../src/audit.ts';
 import { hasConversationAccess, resolveConfig } from '../src/config.ts';
-import { install } from './fixtures.ts';
+import { install, unavailableRuntime } from './fixtures.ts';
 
 const roots: string[] = [];
 after(() => Promise.all(roots.map((r) => rm(r, { recursive: true, force: true }))));
@@ -157,6 +157,12 @@ test('the default log file sits under the state directory', async () => {
   const h = install({ pluginConfig: { briefsDir: '/x' } });
   await h.fire('agent_end', { runId: 'r', messages: [], success: false, error: 'e' }, { agentId: 'a' });
   assert.match(h.warnings.join('\n'), /\/nonexistent-state\/logs\/turn-guard\.jsonl/);
+});
+
+test('a runtime still unavailable when the log is written warns and does not throw', async () => {
+  const h = install({ pluginConfig: { briefsDir: '/x' }, runtime: unavailableRuntime() });
+  await h.fire('agent_end', { runId: 'r', messages: [], success: false, error: 'e' }, { agentId: 'a' });
+  assert.match(h.warnings.join('\n'), /could not write the log file/);
 });
 
 test('a successful automations call (cron as hooks name it) backs "I scheduled it"', async () => {

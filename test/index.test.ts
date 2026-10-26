@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import entry from '../src/index.ts';
 import { PLUGIN_ID } from '../src/config.ts';
+import { install, unavailableRuntime } from './fixtures.ts';
 
 test('the plugin entry loads with the pinned SDK and carries the plugin id', () => {
   assert.equal(entry.id, PLUGIN_ID);
@@ -18,4 +19,10 @@ test('the manifest id, tool contract and defaults match the code', async () => {
   assert.ok(typeof schema === 'object' && schema !== null && 'properties' in schema && typeof schema.properties === 'object' && schema.properties !== null);
   assert.ok('maxBriefChars' in schema.properties && typeof schema.properties.maxBriefChars === 'object' && schema.properties.maxBriefChars !== null);
   assert.equal('default' in schema.properties.maxBriefChars && schema.properties.maxBriefChars.default, 60000);
+});
+
+test('register() does not touch the runtime, which is unavailable during cli-metadata registration', () => {
+  const h = install({ pluginConfig: { briefsDir: '/x' }, runtime: unavailableRuntime() });
+  assert.ok(h.hasHook('after_tool_call'));
+  assert.ok(h.hasHook('agent_end'));
 });
