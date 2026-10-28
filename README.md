@@ -17,9 +17,18 @@ Runs in the gateway process and writes `text` to `<briefsDir>/<YYYY-MM-DD>-<HHMM
 
 Docs relied on: tool registration and the matching `contracts.tools` entry, `docs/plugins/building-plugins.md` (Register tools); a factory may return `null`, same section.
 
-## Install (not yet done)
+## Install
 
-From a checkout, with the gateway owner's approval. The shape of the config change:
+Pinned to a tag or commit of a clone, with the gateway owner's approval:
+
+```sh
+openclaw plugins install git:file:///path/to/openclaw-turn-guard@<tag or commit> --force --accept-capabilities
+openclaw plugins inspect turn-guard --runtime --json
+```
+
+OpenClaw loads the committed `dist/` through `openclaw.runtimeExtensions`, from a git install, a copy, a load path or `--link` alike (`docs/plugins/sdk-entrypoints/package-entries.md:36-38`, 2026.10.8), checked on 2026.10.8: an install runs npm without scripts, so nothing is built then, and a change to `src/` runs only after `npm run build`. `--force` confirms a source that isn't on ClawHub, and `--accept-capabilities` the `publish_brief` tool (`cli/plugins/install.md`).
+
+Or from a checkout. The shape of the config change:
 
 ```json5
 {
@@ -62,6 +71,9 @@ npm ci --ignore-scripts
 npm run lint
 npm run typecheck
 npm test
+npm run build
 ```
+
+Commit `dist/` with any change to `src/`; CI fails when it doesn't match a fresh build.
 
 [docs/how-it-works.md](docs/how-it-works.md), [docs/verification.md](docs/verification.md), [docs/CHANGELOG.md](docs/CHANGELOG.md).
