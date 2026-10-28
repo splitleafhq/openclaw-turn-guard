@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Removed the turn log:** the `agent_end` and `after_tool_call` hooks, `logFile` and the need for `hooks.allowConversationAccess`. It logged only and blocked nothing; of its claims, one was a false positive.
+
 First version, built and tested against OpenClaw 2026.10.5.
 
 - **`publish_brief`:** writes a brief to `briefsDir` under a name built in code, exclusive create, and returns the path the reader sees.

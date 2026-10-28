@@ -1,20 +1,16 @@
 import { type OpenClawPluginApi, definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import { textResult } from 'openclaw/plugin-sdk/tool-results';
 import { type Static, Type } from 'typebox';
-import { JsonlLog, ToolLog, audit } from './audit.ts';
-import { PLUGIN_ID, hasConversationAccess, resolveConfig } from './config.ts';
+import { PLUGIN_ID, resolveConfig } from './config.ts';
 import { publishBrief } from './publish.ts';
 
 type Api = OpenClawPluginApi;
 
 /** The parts of OpenClaw's plugin API this plugin uses. `register` passes OpenClaw's own, and tests pass a stand-in. */
 export interface PluginHost {
-  config: Api['config'];
   pluginConfig?: Api['pluginConfig'];
   logger?: Partial<Pick<Api['logger'], 'warn'>>;
-  on: Api['on'];
   registerTool: Api['registerTool'];
-  runtime: { state: Pick<Api['runtime']['state'], 'resolveStateDir'> };
 }
 
 const TOOL = 'publish_brief';
@@ -69,36 +65,11 @@ export function registerTurnGuard(api: PluginHost): void {
     );
   }
 
-  const tools = new ToolLog();
-  // The runtime throws during CLI-metadata registration, so the state directory is resolved at write time.
-  const log = new JsonlLog(() => config.logFile ?? `${api.runtime.state.resolveStateDir(process.env)}/logs/turn-guard.jsonl`, warn);
-  api.on('after_tool_call', (event, ctx) => {
-    const runId = event.runId ?? ctx.runId;
-    if (runId !== undefined) {
-      tools.record(runId, event.toolName, event.error === undefined);
-    }
-  });
-
-  if (!hasConversationAccess(api.config)) {
-    warn('hooks.allowConversationAccess is not set: agent_end is not registered, so the claim and error log is off');
-    return;
-  }
-  // agent_end fires once per attempt, not per run (a compaction retry re-enters with the same runId), so it doesn't
-  // drop the run's tool record: records age out after six hours.
-  api.on('agent_end', async (event, ctx) => {
-    try {
-      const runId = event.runId ?? ctx.runId;
-      const who = { agentId: ctx.agentId, sessionKey: ctx.sessionKey, runId };
-      await log.write(audit(event, who, tools.list(runId), new Date()));
-    } catch {
-      warn('agent_end check failed');
-    }
-  });
 }
 
 export default definePluginEntry({
   id: PLUGIN_ID,
   name: 'Turn Guard',
-  description: 'Publishes briefs to a host folder, and logs unbacked "I sent it" claims and run errors.',
+  description: 'Publishes briefs to a host folder.',
   register: registerTurnGuard,
 });

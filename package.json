@@ -2,7 +2,7 @@
   "name": "@seriouslysean/openclaw-turn-guard",
   "version": "0.1.0",
   "private": true,
-  "description": "OpenClaw plugin that publishes a research agent's briefs to a host folder, and logs unbacked 'I sent it' claims and run errors.",
+  "description": "OpenClaw plugin that publishes a research agent's briefs to a host folder.",
   "keywords": [
     "openclaw",
     "openclaw-plugin",

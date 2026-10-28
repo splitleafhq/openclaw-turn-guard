@@ -1,7 +1,7 @@
 {
   "id": "turn-guard",
   "name": "Turn Guard",
-  "description": "Publishes an agent's finished briefs to a host folder, and logs unbacked \"I sent it\" claims and run errors. Logging is read-only: it never blocks or rewrites a turn.",
+  "description": "Publishes an agent's finished briefs to a host folder.",
   "categories": [
     "research"
   ],
@@ -22,8 +22,7 @@
     "briefsDir": { "label": "Briefs folder", "help": "Host folder publish_brief writes to. Created if missing." },
     "publishedPathPrefix": { "label": "Published path prefix", "help": "The folder as the reader of the path sees it, such as a bind-mount path.", "advanced": true },
     "publishAgents": { "label": "Agents with publish_brief", "advanced": true },
-    "maxBriefChars": { "label": "Longest brief (characters)", "advanced": true },
-    "logFile": { "label": "Log file", "help": "Needs hooks.allowConversationAccess.", "advanced": true }
+    "maxBriefChars": { "label": "Longest brief (characters)", "advanced": true }
   },
   "configSchema": {
     "type": "object",
@@ -54,11 +53,6 @@
         "maximum": 1000000,
         "description": "Longest brief publish_brief accepts, in characters.",
         "default": 60000
-      },
-      "logFile": {
-        "type": "string",
-        "minLength": 1,
-        "description": "JSON-lines log of unbacked claims and run errors, mode 0600. Default: logs/turn-guard.jsonl under the OpenClaw state directory. Needs hooks.allowConversationAccess."
       }
     }
   }
