@@ -167,3 +167,10 @@ test('a relative or "~" briefsDir is not registered, so no brief lands in the ga
     assert.match(host.warnings.join('\n'), /briefsDir is not an absolute path/);
   }
 });
+
+test('publishAgents ids with spaces or capitals still match the normalized agent id', () => {
+  const host = install({ pluginConfig: { briefsDir: '/x', publishAgents: [' Scribe ', "Drizzt Do'Urden"] } });
+  assert.ok(host.toolFor('scribe'));
+  assert.ok(host.toolFor('drizzt-do-urden'));
+  assert.equal(host.toolFor('drizzt'), undefined);
+});
