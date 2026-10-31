@@ -19,7 +19,7 @@
     "onStartup": true
   },
   "uiHints": {
-    "briefsDir": { "label": "Briefs folder", "help": "Host folder publish_brief writes to. Created if missing." },
+    "briefsDir": { "label": "Briefs folder", "help": "Absolute host folder publish_brief writes to. Created if missing." },
     "publishedPathPrefix": { "label": "Published path prefix", "help": "The folder as the reader of the path sees it, such as a bind-mount path.", "advanced": true },
     "publishAgents": { "label": "Agents with publish_brief", "advanced": true },
     "maxBriefChars": { "label": "Longest brief (characters)", "advanced": true }
@@ -34,7 +34,7 @@
       "briefsDir": {
         "type": "string",
         "minLength": 1,
-        "description": "Host folder publish_brief writes to. Created if missing. No default."
+        "description": "Absolute host folder publish_brief writes to. Created if missing. No default. A relative path leaves publish_brief unregistered."
       },
       "publishedPathPrefix": {
         "type": "string",

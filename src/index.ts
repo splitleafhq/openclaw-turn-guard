@@ -1,4 +1,6 @@
+import { isAbsolute } from 'node:path';
 import { type OpenClawPluginApi, definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
+import { normalizeAgentIdStrict } from 'openclaw/plugin-sdk/routing';
 import { textResult } from 'openclaw/plugin-sdk/tool-results';
 import { type Static, Type } from 'typebox';
 import { PLUGIN_ID, resolveConfig } from './config.ts';
@@ -24,9 +26,13 @@ function fail(message: string) {
   return textResult(`${TOOL} failed: ${message}`, { status: 'failed' });
 }
 
-/** Agent ids are compared lowercase, as OpenClaw normalizes them. */
+/** Config ids are kept as written, so both sides go through OpenClaw's normalization; an id with no valid characters never matches. */
 function listed(agentId: string | undefined, ids: string[]): boolean {
-  return agentId !== undefined && ids.some((id) => id.toLowerCase() === agentId.toLowerCase());
+  const agent = normalizeAgentIdStrict(agentId);
+  return agent.ok && ids.some((id) => {
+    const listedId = normalizeAgentIdStrict(id);
+    return listedId.ok && listedId.value === agent.value;
+  });
 }
 
 export function registerTurnGuard(api: PluginHost): void {
@@ -36,6 +42,9 @@ export function registerTurnGuard(api: PluginHost): void {
 
   if (briefsDir === undefined) {
     warn('briefsDir is not set: publish_brief is not registered');
+  } else if (!isAbsolute(briefsDir)) {
+    // A relative path resolves against the gateway's cwd, and the returned path would not open from the reader's.
+    warn(`briefsDir is not an absolute path (${briefsDir}): publish_brief is not registered`);
   } else {
     api.registerTool(
       (ctx) => {
