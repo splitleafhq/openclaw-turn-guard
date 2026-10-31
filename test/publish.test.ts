@@ -160,6 +160,14 @@ test('publish_brief goes only to agents in publishAgents, and is not registered 
   assert.match(none.warnings.join('\n'), /briefsDir is not set/);
 });
 
+test('a relative or "~" briefsDir is not registered, so no brief lands in the gateway cwd under a path the reader cannot open', () => {
+  for (const briefsDir of ['briefs', '~/briefs']) {
+    const host = install({ pluginConfig: { briefsDir } });
+    assert.equal(host.toolFor('research'), undefined, briefsDir);
+    assert.match(host.warnings.join('\n'), /briefsDir is not an absolute path/);
+  }
+});
+
 test('publishAgents ids with spaces or capitals still match the normalized agent id', () => {
   const host = install({ pluginConfig: { briefsDir: '/x', publishAgents: [' Scribe ', "Drizzt Do'Urden"] } });
   assert.ok(host.toolFor('scribe'));
