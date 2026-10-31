@@ -86,13 +86,13 @@ test('a path-like topic stays inside briefsDir', async () => {
   assert.equal(text(r), `${dir}/briefs/${name}`);
 });
 
-test('an unwritable briefsDir returns an error result and does not throw', async () => {
+test('an unwritable briefsDir reports the OS error code, not fs-safe\'s category, and does not throw', { skip: process.getuid?.() === 0 && 'root ignores directory permissions' }, async () => {
   const dir = await temp();
   await chmod(dir, 0o500);
-  const t = await tool(join(dir, 'sub'));
+  const t = await tool(dir);
   const r = await t.execute('c1', { topic: 'Catti-brie', text: 'a brief' });
   await chmod(dir, 0o700);
-  assert.match(text(r), /^publish_brief failed: the write failed/);
+  assert.match(text(r), /^publish_brief failed: the write failed \(EACCES\)/);
   assert.deepEqual(r.details, { status: 'failed' });
 });
 

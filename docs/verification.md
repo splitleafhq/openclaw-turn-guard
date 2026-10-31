@@ -3,7 +3,7 @@
 ## Checked
 
 - **Unit tests** (`npm test`, synthetic data, temp folders, no network) cover:
-  - two briefs on one topic in one second; a name collision; a symlink at the chosen name; no temporary file left behind; a 10,000-character round trip; an unwritable folder; a path-like topic; empty and oversized text; the path prefix; agent gating, including `publishAgents` ids with spaces or capitals; a relative or `~` `briefsDir`;
+  - two briefs on one topic in one second; a name collision; a symlink at the chosen name; no temporary file left behind; a 10,000-character round trip; an unwritable folder, reported by its OS error code (skipped as root, which ignores directory permissions); a path-like topic; empty and oversized text; the path prefix; agent gating, including `publishAgents` ids with spaces or capitals; a relative or `~` `briefsDir`;
 - **Typecheck** against the OpenClaw 2026.10.5 plugin SDK; lint with oxlint.
 - The tests call the handlers through a stand-in for the plugin API. They do not run OpenClaw's plugin loader or a gateway.
 - **Copy install in OpenClaw 2026.10.8:** in an isolated state directory (`OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`), `plugins install <checkout> --force --accept-capabilities`, a `briefsDir`, then `plugins inspect turn-guard --runtime --json` reports `status: loaded` from `dist/index.js` with `toolNames: [publish_brief]`. Before `dist/` was committed, the same install failed: "requires compiled runtime output for TypeScript entry ./src/index.ts".
@@ -23,3 +23,4 @@ An adversarial review read the installed `dist/` (2026-10-24). Not run on a gate
 3. **`ctx.agentId` reaches the tool factory already normalized.** The plugin normalizes it again, so matching does not depend on it.
 4. **No `turn-guard failed during register` line on a live gateway** after installing this fix.
 5. **Whether OpenClaw expands `~` in plugin config before `register`.** Not checked. In OpenClaw 2026.10.5, `api.resolvePath` (`docs/plugins/sdk-runtime.md`) expands `~` only when a plugin calls it, and resolves a relative path against the plugin root, not a data folder. If it does not, a `~/...` `briefsDir` is refused as relative.
+6. **ENOSPC and EROFS reach the result by their code.** `@openclaw/fs-safe` 0.25.0 (OpenClaw 2026.10.5's dependency), `docs/errors.md` and `dist/root-errors.js`, wraps them as `invalid-path` with the OS error in `cause`; only EACCES is tested. A disk-space failure combined with a cleanup failure has a `SuppressedError` as its `cause` and is still reported as `invalid-path`.
