@@ -20,8 +20,10 @@ export function stamp(date) {
 function errno(error) {
     return typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
 }
+/** fs-safe reports a failed write as `invalid-path` and keeps the OS error in `cause`. */
 function reason(error) {
-    const code = errno(error);
+    const cause = error instanceof FsSafeError ? errno(error.cause) : undefined;
+    const code = typeof cause === 'string' ? cause : errno(error);
     return typeof code === 'string' ? `the write failed (${code})` : 'the write failed';
 }
 /**
