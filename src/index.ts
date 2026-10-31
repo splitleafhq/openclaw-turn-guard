@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { type OpenClawPluginApi, definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import { textResult } from 'openclaw/plugin-sdk/tool-results';
 import { type Static, Type } from 'typebox';
@@ -36,6 +37,9 @@ export function registerTurnGuard(api: PluginHost): void {
 
   if (briefsDir === undefined) {
     warn('briefsDir is not set: publish_brief is not registered');
+  } else if (!isAbsolute(briefsDir)) {
+    // A relative path resolves against the gateway's cwd, and the returned path would not open from the reader's.
+    warn(`briefsDir is not an absolute path (${briefsDir}): publish_brief is not registered`);
   } else {
     api.registerTool(
       (ctx) => {
