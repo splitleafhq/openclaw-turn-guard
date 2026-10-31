@@ -159,3 +159,10 @@ test('publish_brief goes only to agents in publishAgents, and is not registered 
   assert.equal(none.toolFor('research'), undefined);
   assert.match(none.warnings.join('\n'), /briefsDir is not set/);
 });
+
+test('publishAgents ids with spaces or capitals still match the normalized agent id', () => {
+  const host = install({ pluginConfig: { briefsDir: '/x', publishAgents: [' Scribe ', "Drizzt Do'Urden"] } });
+  assert.ok(host.toolFor('scribe'));
+  assert.ok(host.toolFor('drizzt-do-urden'));
+  assert.equal(host.toolFor('drizzt'), undefined);
+});
