@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
 
 - **Fixed:** a failed write names the OS error (`EACCES`, `ENOSPC`, `EROFS`) instead of fs-safe's `invalid-path`.
 - **A relative `briefsDir` is refused:** it resolved against the gateway's cwd and the tool returned a relative path the reader agent could not open; `~/...` made a literal `~` folder. A `briefsDir` that is not absolute now leaves `publish_brief` unregistered with a warning, as an unset one does.
