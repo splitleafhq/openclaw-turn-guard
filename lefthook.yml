@@ -1,8 +1,0 @@
-# Pre-push gate: the command CI runs on a pull request. Enable with: lefthook install
-pre-push:
-  commands:
-    check:
-      run: |
-        # git sets repo-local variables for a hook; run from a linked worktree they point npm's children at the wrong repository.
-        unset $(git rev-parse --local-env-vars)
-        npm run lint && npm run typecheck && npm test && npm run build && git diff --exit-code HEAD -- dist && test -z "$(git ls-files --others --exclude-standard -- dist)"
