@@ -10,7 +10,7 @@ npm test
 npm run build
 ```
 
-A pre-push gate runs these checks before each push: `lefthook install` turns it on (`lefthook.yml`).
+`scripts/check` runs these checks, as CI does. Run `git config core.hooksPath .githooks` once per clone and the pre-push hook runs it before each push.
 
 Commit `dist/` with any change to `src/`; CI fails when it doesn't match a fresh build.
 
