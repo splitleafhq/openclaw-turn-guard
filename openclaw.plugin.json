@@ -80,7 +80,7 @@
       "queue": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Makes listed agents answer one inbound turn at a time. Needs hooks.allowConversationAccess for agent_end.",
+        "description": "Makes listed agents answer one inbound turn at a time. Needs hooks.allowConversationAccess for before_agent_run and agent_end.",
         "properties": {
           "agents": {
             "type": "array",
@@ -93,45 +93,60 @@
           },
           "maxWaitMs": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 290000,
-            "description": "Longest a turn waits for its agent, in milliseconds. Past it the sender gets busyText. OpenClaw aborts an inbound message not adopted within 300000 ms.",
-            "default": 270000
+            "minimum": 1000,
+            "maximum": 270000,
+            "description": "Longest a turn waits for its agent, in milliseconds. Past it the sender gets busyText. OpenClaw aborts an inbound message not adopted within 300000 ms of its claim.",
+            "default": 240000
           },
           "maxWaiting": {
             "type": "integer",
             "minimum": 1,
             "maximum": 1000,
-            "description": "Most turns waiting per agent. A turn arriving at a full line gets busyText at once.",
-            "default": 4
+            "description": "Most turns waiting per agent. A turn arriving at a full line gets busyText at once. Unset: no limit; maxWaitMs still bounds every wait."
           },
-          "maxHoldMs": {
+          "startGraceMs": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 86400000,
-            "description": "A turn that never reports its end frees the agent after this long, in milliseconds.",
-            "default": 300000
-          },
-          "restMs": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3600000,
-            "description": "Pause before the next waiting turn while the agent has been busy, in milliseconds.",
+            "minimum": 1000,
+            "maximum": 600000,
+            "description": "How long a turn that was let through may take to start a run, in milliseconds, before the agent is freed. Covers commands and claimed or aborted turns, which start none.",
             "default": 60000
           },
-          "busyShare": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "maximum": 1,
-            "description": "The agent counts as busy when its turns filled more than this share of busyWindowMs. 1 turns the rest off.",
-            "default": 0.5
-          },
-          "busyWindowMs": {
+          "maxRunMs": {
             "type": "integer",
-            "minimum": 1,
+            "minimum": 60000,
             "maximum": 86400000,
-            "description": "Window busyShare is measured over, in milliseconds.",
-            "default": 600000
+            "description": "A run that reports no end frees the agent after this long, in milliseconds. Set it above the agent's longest run.",
+            "default": 900000
+          },
+          "rest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "afterBusyShare",
+              "windowMs",
+              "pauseMs"
+            ],
+            "description": "Optional pause between turns after a busy stretch. Unset: no pause.",
+            "properties": {
+              "afterBusyShare": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+                "description": "Busy means the agent's runs filled more than this share of windowMs."
+              },
+              "windowMs": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 86400000,
+                "description": "Window the share is measured over, in milliseconds."
+              },
+              "pauseMs": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600000,
+                "description": "Pause before the next turn while busy, in milliseconds. A waiting turn still starts before its maxWaitMs."
+              }
+            }
           },
           "busyText": {
             "type": "string",

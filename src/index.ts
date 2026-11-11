@@ -5,7 +5,7 @@ import { textResult } from 'openclaw/plugin-sdk/tool-results';
 import { type Static, Type } from 'typebox';
 import { PLUGIN_ID, resolveConfig } from './config.ts';
 import { publishBrief } from './publish.ts';
-import { createAgentQueue } from './queue.ts';
+import { type Timers, createAgentQueue } from './queue.ts';
 
 type Api = OpenClawPluginApi;
 
@@ -37,7 +37,8 @@ function listed(agentId: string | undefined, ids: string[]): boolean {
   });
 }
 
-export function registerTurnGuard(api: PluginHost): void {
+/** `timers` is the clock the queue runs on; only tests pass one. */
+export function registerTurnGuard(api: PluginHost, timers?: Timers): void {
   const config = resolveConfig(api.pluginConfig);
   const warn = (message: string) => api.logger?.warn?.(`[${PLUGIN_ID}] ${message}`);
   const { briefsDir } = config;
@@ -77,7 +78,7 @@ export function registerTurnGuard(api: PluginHost): void {
   }
 
   if (config.queue.agents.length > 0) {
-    const queue = createAgentQueue(config.queue, (message) => api.logger?.info?.(`[${PLUGIN_ID}] ${message}`));
+    const queue = createAgentQueue(config.queue, (message) => api.logger?.info?.(`[${PLUGIN_ID}] ${message}`), timers);
     // Waiting here keeps the message in OpenClaw's durable ingress queue; a claim hook has no runner timeout.
     api.on('before_dispatch', async (event, ctx) => {
       const admission = await queue.acquire(event.sessionKey ?? ctx.sessionKey, event.messageId ?? ctx.messageId);
@@ -89,8 +90,12 @@ export function registerTurnGuard(api: PluginHost): void {
       }
       return undefined;
     });
-    api.on('agent_end', (_event, ctx) => {
-      queue.release(ctx.sessionKey);
+    api.on('before_agent_run', (_event, ctx) => {
+      queue.runStarted(ctx.sessionKey, ctx.runId);
+      return undefined;
+    });
+    api.on('agent_end', (event, ctx) => {
+      queue.runEnded(ctx.sessionKey, event.runId ?? ctx.runId, event.success);
     });
   }
 }
@@ -99,5 +104,5 @@ export default definePluginEntry({
   id: PLUGIN_ID,
   name: 'Turn Guard',
   description: 'Publishes briefs to a host folder and can queue an agent\'s turns one at a time.',
-  register: registerTurnGuard,
+  register: (api) => registerTurnGuard(api),
 });

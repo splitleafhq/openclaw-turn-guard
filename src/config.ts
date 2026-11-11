@@ -1,4 +1,4 @@
-import type { QueueConfig } from './queue.ts';
+import type { QueueConfig, RestConfig } from './queue.ts';
 
 export const PLUGIN_ID = 'turn-guard';
 
@@ -30,6 +30,17 @@ function share(value: unknown, fallback: number): number {
   return typeof value === 'number' && value > 0 && value <= 1 ? value : fallback;
 }
 
+/** All three or nothing: a rest with a guessed part would pause turns on numbers nobody chose. */
+function restConfig(value: unknown): RestConfig | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const afterBusyShare = share(value.afterBusyShare, 0);
+  const windowMs = count(value.windowMs, 0);
+  const pauseMs = count(value.pauseMs, 0);
+  return afterBusyShare > 0 && windowMs > 0 && pauseMs > 0 ? { afterBusyShare, windowMs, pauseMs } : undefined;
+}
+
 /** The manifest schema rejects bad shapes; these fallbacks cover a config that never went through it. */
 export function resolveConfig(raw: unknown): TurnGuardConfig {
   const c = isRecord(raw) ? raw : {};
@@ -41,12 +52,11 @@ export function resolveConfig(raw: unknown): TurnGuardConfig {
     maxBriefChars: count(c.maxBriefChars, 60000),
     queue: {
       agents: strings(q.agents, []),
-      maxWaitMs: count(q.maxWaitMs, 270000),
-      maxWaiting: count(q.maxWaiting, 4),
-      maxHoldMs: count(q.maxHoldMs, 300000),
-      restMs: count(q.restMs, 60000),
-      busyShare: share(q.busyShare, 0.5),
-      busyWindowMs: count(q.busyWindowMs, 600000),
+      maxWaitMs: count(q.maxWaitMs, 240000),
+      maxWaiting: typeof q.maxWaiting === 'number' ? count(q.maxWaiting, 1) : undefined,
+      startGraceMs: count(q.startGraceMs, 60000),
+      maxRunMs: count(q.maxRunMs, 900000),
+      rest: restConfig(q.rest),
       busyText: text(q.busyText) ?? "I'm working through a line of questions right now. Ask again in a few minutes.",
     },
   };
