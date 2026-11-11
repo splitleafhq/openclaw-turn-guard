@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - **Added `queue`:** agents listed in `queue.agents` answer one inbound turn at a time. A turn for a busy agent waits in `before_dispatch` (up to `maxWaitMs`, default 240 s, under OpenClaw's 300 s ingress limit) and runs when the holder's run ends (`before_agent_run`, `agent_end`); a wait past the limit, or a full line when `maxWaiting` is set, gets `busyText` with no model call. A turn that starts no run frees the agent after `startGraceMs`. An optional `rest` pauses between turns after a busy stretch. Off by default. Needs `hooks.allowConversationAccess` again.
 
