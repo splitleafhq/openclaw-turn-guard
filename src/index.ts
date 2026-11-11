@@ -5,14 +5,16 @@ import { textResult } from 'openclaw/plugin-sdk/tool-results';
 import { type Static, Type } from 'typebox';
 import { PLUGIN_ID, resolveConfig } from './config.ts';
 import { publishBrief } from './publish.ts';
+import { createAgentQueue } from './queue.ts';
 
 type Api = OpenClawPluginApi;
 
 /** The parts of OpenClaw's plugin API this plugin uses. `register` passes OpenClaw's own, and tests pass a stand-in. */
 export interface PluginHost {
   pluginConfig?: Api['pluginConfig'];
-  logger?: Partial<Pick<Api['logger'], 'warn'>>;
+  logger?: Partial<Pick<Api['logger'], 'warn' | 'info'>>;
   registerTool: Api['registerTool'];
+  on: Api['on'];
 }
 
 const TOOL = 'publish_brief';
@@ -74,11 +76,28 @@ export function registerTurnGuard(api: PluginHost): void {
     );
   }
 
+  if (config.queue.agents.length > 0) {
+    const queue = createAgentQueue(config.queue, (message) => api.logger?.info?.(`[${PLUGIN_ID}] ${message}`));
+    // Waiting here keeps the message in OpenClaw's durable ingress queue; a claim hook has no runner timeout.
+    api.on('before_dispatch', async (event, ctx) => {
+      const admission = await queue.acquire(event.sessionKey ?? ctx.sessionKey, event.messageId ?? ctx.messageId);
+      if (admission === 'full' || admission === 'timeout') {
+        return { handled: true, text: config.queue.busyText };
+      }
+      if (admission === 'replaced') {
+        return { handled: true };
+      }
+      return undefined;
+    });
+    api.on('agent_end', (_event, ctx) => {
+      queue.release(ctx.sessionKey);
+    });
+  }
 }
 
 export default definePluginEntry({
   id: PLUGIN_ID,
   name: 'Turn Guard',
-  description: 'Publishes briefs to a host folder.',
+  description: 'Publishes briefs to a host folder and can queue an agent\'s turns one at a time.',
   register: registerTurnGuard,
 });

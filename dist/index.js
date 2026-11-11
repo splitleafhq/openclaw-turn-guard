@@ -5,6 +5,7 @@ import { textResult } from 'openclaw/plugin-sdk/tool-results';
 import { Type } from 'typebox';
 import { PLUGIN_ID, resolveConfig } from './config.js';
 import { publishBrief } from './publish.js';
+import { createAgentQueue } from './queue.js';
 const TOOL = 'publish_brief';
 const PARAMETERS = Type.Object({
     topic: Type.String({ description: 'Short subject of the brief. It only names the file.' }),
@@ -57,10 +58,27 @@ export function registerTurnGuard(api) {
             };
         }, { name: TOOL, optional: true });
     }
+    if (config.queue.agents.length > 0) {
+        const queue = createAgentQueue(config.queue, (message) => api.logger?.info?.(`[${PLUGIN_ID}] ${message}`));
+        // Waiting here keeps the message in OpenClaw's durable ingress queue; a claim hook has no runner timeout.
+        api.on('before_dispatch', async (event, ctx) => {
+            const admission = await queue.acquire(event.sessionKey ?? ctx.sessionKey, event.messageId ?? ctx.messageId);
+            if (admission === 'full' || admission === 'timeout') {
+                return { handled: true, text: config.queue.busyText };
+            }
+            if (admission === 'replaced') {
+                return { handled: true };
+            }
+            return undefined;
+        });
+        api.on('agent_end', (_event, ctx) => {
+            queue.release(ctx.sessionKey);
+        });
+    }
 }
 export default definePluginEntry({
     id: PLUGIN_ID,
     name: 'Turn Guard',
-    description: 'Publishes briefs to a host folder.',
+    description: 'Publishes briefs to a host folder and can queue an agent\'s turns one at a time.',
     register: registerTurnGuard,
 });

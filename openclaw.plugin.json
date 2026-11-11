@@ -1,7 +1,7 @@
 {
   "id": "turn-guard",
   "name": "Turn Guard",
-  "description": "Publishes an agent's finished briefs to a host folder.",
+  "description": "Publishes an agent's finished briefs to a host folder, and can make listed agents answer one turn at a time.",
   "categories": [
     "research"
   ],
@@ -19,10 +19,28 @@
     "onStartup": true
   },
   "uiHints": {
-    "briefsDir": { "label": "Briefs folder", "help": "Absolute host folder publish_brief writes to. Created if missing." },
-    "publishedPathPrefix": { "label": "Published path prefix", "help": "The folder as the reader of the path sees it, such as a bind-mount path.", "advanced": true },
-    "publishAgents": { "label": "Agents with publish_brief", "advanced": true },
-    "maxBriefChars": { "label": "Longest brief (characters)", "advanced": true }
+    "briefsDir": {
+      "label": "Briefs folder",
+      "help": "Absolute host folder publish_brief writes to. Created if missing."
+    },
+    "publishedPathPrefix": {
+      "label": "Published path prefix",
+      "help": "The folder as the reader of the path sees it, such as a bind-mount path.",
+      "advanced": true
+    },
+    "publishAgents": {
+      "label": "Agents with publish_brief",
+      "advanced": true
+    },
+    "maxBriefChars": {
+      "label": "Longest brief (characters)",
+      "advanced": true
+    },
+    "queue": {
+      "label": "One-at-a-time agents",
+      "help": "Agents whose inbound turns run one at a time; the rest wait their turn.",
+      "advanced": true
+    }
   },
   "configSchema": {
     "type": "object",
@@ -43,9 +61,14 @@
       },
       "publishAgents": {
         "type": "array",
-        "items": { "type": "string", "minLength": 1 },
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
         "description": "Agent ids that get publish_brief.",
-        "default": ["research"]
+        "default": [
+          "research"
+        ]
       },
       "maxBriefChars": {
         "type": "integer",
@@ -53,6 +76,70 @@
         "maximum": 1000000,
         "description": "Longest brief publish_brief accepts, in characters.",
         "default": 60000
+      },
+      "queue": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Makes listed agents answer one inbound turn at a time. Needs hooks.allowConversationAccess for agent_end.",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Agent ids that answer one turn at a time. Empty or unset: nothing is queued.",
+            "default": []
+          },
+          "maxWaitMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 290000,
+            "description": "Longest a turn waits for its agent, in milliseconds. Past it the sender gets busyText. OpenClaw aborts an inbound message not adopted within 300000 ms.",
+            "default": 270000
+          },
+          "maxWaiting": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Most turns waiting per agent. A turn arriving at a full line gets busyText at once.",
+            "default": 4
+          },
+          "maxHoldMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000,
+            "description": "A turn that never reports its end frees the agent after this long, in milliseconds.",
+            "default": 300000
+          },
+          "restMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600000,
+            "description": "Pause before the next waiting turn while the agent has been busy, in milliseconds.",
+            "default": 60000
+          },
+          "busyShare": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "description": "The agent counts as busy when its turns filled more than this share of busyWindowMs. 1 turns the rest off.",
+            "default": 0.5
+          },
+          "busyWindowMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000,
+            "description": "Window busyShare is measured over, in milliseconds.",
+            "default": 600000
+          },
+          "busyText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Reply to a turn that is not queued or waited too long."
+          }
+        }
       }
     }
   }

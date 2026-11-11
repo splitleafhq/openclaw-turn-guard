@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Added `queue`:** agents listed in `queue.agents` answer one inbound turn at a time. A turn for a busy agent waits in `before_dispatch` (up to `maxWaitMs`, default 270 s, under OpenClaw's 300 s ingress limit) and runs when `agent_end` frees the agent; a full line or a wait past the limit gets `busyText` with no model call. After a busy stretch the next turn rests `restMs`. Off by default. Needs `hooks.allowConversationAccess` again, for `agent_end`.
+
 ## 0.1.1
 
 - **Fixed:** a failed write names the OS error (`EACCES`, `ENOSPC`, `EROFS`) instead of fs-safe's `invalid-path`.
