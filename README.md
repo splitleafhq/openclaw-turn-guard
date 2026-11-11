@@ -1,8 +1,8 @@
 # openclaw-turn-guard
 
-An [OpenClaw](https://docs.openclaw.ai) plugin (id `turn-guard`) with one tool for a research agent: **`publish_brief`** saves a finished brief to a host folder and returns the path the reader sees.
+An [OpenClaw](https://docs.openclaw.ai) plugin (id `turn-guard`) with one tool for a research agent, **`publish_brief`**, which saves a finished brief to a host folder and returns the path the reader sees, and an optional **queue** that makes listed agents answer one turn at a time.
 
-**Status:** built and unit-tested against OpenClaw 2026.10.5. Not installed anywhere, not published. What a live gateway still has to confirm is in [docs/verification.md](docs/verification.md).
+**Status:** built and unit-tested against OpenClaw 2026.10.5. The queue was written from reading 2026.11.2; an earlier, simpler version of it ran on a 2026.11.2 gateway. Not installed anywhere, not published. What a live gateway still has to confirm is in [docs/verification.md](docs/verification.md).
 
 ## What it does
 
@@ -16,6 +16,12 @@ Runs in the gateway process and writes `text` to `<briefsDir>/<YYYY-MM-DD>-<HHMM
 - Only agents in `publishAgents` (default `["research"]`) get the tool: the factory returns `null` for the rest.
 
 Docs relied on: tool registration and the matching `contracts.tools` entry, `docs/plugins/building-plugins.md` (Register tools); a factory may return `null`, same section.
+
+### 2. One-at-a-time agents (`queue`)
+
+Off by default. With `queue.agents` set, an inbound turn for a listed agent waits in `before_dispatch` while that agent is answering another session, and runs when that run ends. A turn that would wait longer than `maxWaitMs` (default 240 s) gets a fixed "ask again" reply with no model call. An optional `rest` pauses between turns after a busy stretch. It needs `hooks.allowConversationAccess: true`.
+
+Settings: [docs/configuration.md](docs/configuration.md). Why the wait is bounded: [docs/how-it-works.md](docs/how-it-works.md).
 
 ## Install
 
