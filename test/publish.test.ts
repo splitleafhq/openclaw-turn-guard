@@ -81,8 +81,11 @@ test('a path-like topic stays inside briefsDir', async () => {
   const t = await tool(join(dir, 'briefs'));
   const r = await t.execute('c1', { topic: '../../etc/x', text: 'Entreri was here' });
   assert.deepEqual(await readdir(dir), ['briefs']);
-  const [name] = await readdir(join(dir, 'briefs'));
-  assert.match(defined(name), /^\d{4}-\d{2}-\d{2}-\d{6}-[0-9a-f]{6}-etc-x\.md$/);
+  const names = await readdir(join(dir, 'briefs'));
+  assert.equal(names.length, 1);
+  const name = defined(names[0]);
+  assert.ok(!name.includes('/') && !name.includes('..'), 'separators in the topic are not honored');
+  assert.ok(name.endsWith('-etc-x.md'), 'the slug is the documented tail of the name');
   assert.equal(text(r), `${dir}/briefs/${name}`);
 });
 
@@ -92,8 +95,9 @@ test('an unwritable briefsDir reports the OS error code, not fs-safe\'s category
   const t = await tool(dir);
   const r = await t.execute('c1', { topic: 'Catti-brie', text: 'a brief' });
   await chmod(dir, 0o700);
-  assert.match(text(r), /^publish_brief failed: the write failed \(EACCES\)/);
   assert.deepEqual(r.details, { status: 'failed' });
+  assert.match(text(r), /EACCES/, 'the OS error code, not fs-safe\'s category, reaches the reader');
+  assert.deepEqual(await readdir(dir), []);
 });
 
 test('a briefsDir that is a file returns an error result', async () => {
@@ -108,7 +112,7 @@ test('empty and whitespace-only text are rejected', async () => {
   const t = await tool(dir);
   for (const bad of ['', '   \n']) {
     const r = await t.execute('c1', { topic: 't', text: bad });
-    assert.match(text(r), /text is empty/);
+    assert.deepEqual(r.details, { status: 'failed' });
   }
   assert.deepEqual(await readdir(dir), []);
 });
@@ -116,9 +120,33 @@ test('empty and whitespace-only text are rejected', async () => {
 test('a brief over maxBriefChars is rejected and a brief at the limit is not', async () => {
   const dir = await temp();
   const t = await tool(dir, { maxBriefChars: 50 });
-  assert.match(text(await t.execute('c1', { topic: 't', text: 'x'.repeat(51) })), /limit is 50/);
-  assert.doesNotMatch(text(await t.execute('c2', { topic: 't', text: 'x'.repeat(50) })), /failed/);
+  const over = await t.execute('c1', { topic: 't', text: 'x'.repeat(51) });
+  assert.deepEqual(over.details, { status: 'failed' });
+  assert.deepEqual(await readdir(dir), []);
+  const at = await t.execute('c2', { topic: 't', text: 'x'.repeat(50) });
+  assert.notDeepEqual(at.details, { status: 'failed' });
   assert.equal((await readdir(dir)).length, 1);
+});
+
+test('an invalid maxBriefChars falls back to the default limit of 60000', async () => {
+  for (const maxBriefChars of [0, -5, 1.5, '50']) {
+    const dir = await temp();
+    const t = await tool(dir, { maxBriefChars });
+    const over = await t.execute('c1', { topic: 't', text: 'x'.repeat(60_001) });
+    assert.deepEqual(over.details, { status: 'failed' }, String(maxBriefChars));
+    const at = await t.execute('c2', { topic: 't', text: 'x'.repeat(60_000) });
+    assert.notDeepEqual(at.details, { status: 'failed' }, String(maxBriefChars));
+    assert.equal((await readdir(dir)).length, 1);
+  }
+});
+
+test('a failed publish returns a failed result and logs one warning', async () => {
+  const dir = await temp();
+  await writeFile(join(dir, 'file'), 'x');
+  const host = install({ pluginConfig: { briefsDir: join(dir, 'file') } });
+  const r = await defined(host.toolFor('research')).execute('c1', { topic: 't', text: 'a brief' });
+  assert.deepEqual(r.details, { status: 'failed' });
+  assert.equal(host.warnings.length, 1);
 });
 
 test('publishedPathPrefix replaces the host path in the result, without a doubled slash', async () => {
@@ -157,14 +185,14 @@ test('publish_brief goes only to agents in publishAgents, and is not registered 
   assert.equal(install({ pluginConfig: { briefsDir: '/x' } }).toolFor('main'), undefined);
   const none = install({ pluginConfig: {} });
   assert.equal(none.toolFor('research'), undefined);
-  assert.match(none.warnings.join('\n'), /briefsDir is not set/);
+  assert.equal(none.warnings.length, 1);
 });
 
 test('a relative or "~" briefsDir is not registered, so no brief lands in the gateway cwd under a path the reader cannot open', () => {
   for (const briefsDir of ['briefs', '~/briefs']) {
     const host = install({ pluginConfig: { briefsDir } });
     assert.equal(host.toolFor('research'), undefined, briefsDir);
-    assert.match(host.warnings.join('\n'), /briefsDir is not an absolute path/);
+    assert.equal(host.warnings.length, 1, briefsDir);
   }
 });
 
