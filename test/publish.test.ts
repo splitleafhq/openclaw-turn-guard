@@ -84,8 +84,8 @@ test('a path-like topic stays inside briefsDir', async () => {
   const names = await readdir(join(dir, 'briefs'));
   assert.equal(names.length, 1);
   const name = defined(names[0]);
-  assert.ok(!name.includes('/') && !name.includes('..'), 'separators in the topic are not honored');
-  assert.ok(name.endsWith('-etc-x.md'), 'the slug is the documented tail of the name');
+  // The file name format the README documents; the topic's separators and dots are not honoured.
+  assert.match(name, /^\d{4}-\d{2}-\d{2}-\d{6}-[0-9a-f]{6}-etc-x\.md$/);
   assert.equal(text(r), `${dir}/briefs/${name}`);
 });
 
@@ -122,6 +122,8 @@ test('a brief over maxBriefChars is rejected and a brief at the limit is not', a
   const t = await tool(dir, { maxBriefChars: 50 });
   const over = await t.execute('c1', { topic: 't', text: 'x'.repeat(51) });
   assert.deepEqual(over.details, { status: 'failed' });
+  // The agent reads the limit to retry with a shorter brief.
+  assert.match(text(over), /\b50\b/);
   assert.deepEqual(await readdir(dir), []);
   const at = await t.execute('c2', { topic: 't', text: 'x'.repeat(50) });
   assert.notDeepEqual(at.details, { status: 'failed' });
